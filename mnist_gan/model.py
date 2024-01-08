@@ -129,9 +129,7 @@ class GAN(pl.LightningModule):
             plt.imshow(
                 sample_imgs.detach()[i, 0, :, :], cmap="gray_r", interpolation="none"
             )
-            plt.title(f"generated data at epoch {self.current_epoch}")
             plt.xticks([])
             plt.yticks([])
             plt.axis("off")
         plt.show()
-    

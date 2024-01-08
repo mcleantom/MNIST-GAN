@@ -11,6 +11,16 @@ pip install -r requirements.txt
 python -m mnist_gan main
 ```
 
+## Example Output
+
+Epoch 0:
+
+![Epoch 0](./images/epoch_0.png)
+
+Epoch 95:
+
+![Epoch 95](./images/epoch_95.png)
+
 ## Explanation
 
 In a Generative Adversarial Network (GAN), the generator and discriminator are two neural networks that are trained simultaneously through adversarial training. Their roles are distinct but complementary in the GAN framework:
