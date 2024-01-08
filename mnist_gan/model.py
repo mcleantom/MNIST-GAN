@@ -51,8 +51,8 @@ class GAN(pl.LightningModule):
         self.save_hyperparameters()
         self.generator = Generator(self.hparams.latent_dim)
         self.discriminator = Discriminator()
-        # self.validation_z = torch.randn(6, self.hparams.latent_dim)
         self.automatic_optimization = False
+        self.criterion = self.adversarial_loss
     
     def sample_z(self, n) -> torch.Tensor:
         sample = torch.randn((n, self.hparams.latent_dim), device=self.device)

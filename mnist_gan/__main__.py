@@ -51,21 +51,5 @@ def main(
     model.plot_imgs()
 
 
-
-@app.command()
-def get_mnist(download_dir: Path = DEFAULT_DATA_DIR):
-    # if download path, assert it is a directory
-    if download_dir is not None:
-        if not download_dir.exists():
-            download_dir.mkdir()
-        if not download_dir.is_dir():
-            raise ValueError("download_dir must be a directory")
-    typer.echo("Downloading MNIST dataset")
-    MNISTDataModule(
-        batch_size=None,
-        data_dir=download_dir
-    ).prepare_data()
-
-
 if __name__ == "__main__":
     app()
