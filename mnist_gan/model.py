@@ -71,16 +71,22 @@ class GAN(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         g_opt, d_opt = self.optimizers()
         
-        X, _ = batch
-        batch_size = X.size(0)
+        real_imgs, _ = batch
+        batch_size = real_imgs.size(0)
         z = torch.randn(batch_size, self.hparams.latent_dim)
+        z = z.type_as(real_imgs)
+
+        fake_imgs = self(z)
+        y_hat = self.discriminator(fake_imgs)
+        y = torch.ones((batch_size, 1), device=self.device)
+        y = y.type_as(real_imgs)
+        g_loss = self.criterion(y_hat, y)
 
         real_label = torch.ones((batch_size, 1), device=self.device)
         fake_label = torch.zeros((batch_size, 1), device=self.device)
 
         g_X = self.sample_G(batch_size)
         
-        ## OPTIMIZE DISCRIMINATOR
         d_x = self.discriminator(X)
         errD_real = self.criterion(d_x, real_label)
 
@@ -96,7 +102,6 @@ class GAN(pl.LightningModule):
         self.manual_backward(errD)
         d_opt.step()
 
-        ## OPTIMIZE GENERATOR
         d_z = self.discriminator(g_X)
         errG = self.criterion(d_z, real_label)
 
@@ -119,10 +124,7 @@ class GAN(pl.LightningModule):
     def plot_imgs(self):
         z = self.sample_z(6)
         sample_imgs = self(z).cpu()
-        print(f"sample_imgs.shape: {sample_imgs.shape}")
-
         for i in range(sample_imgs.size(0)):
-            print(f"sample_imgs[{i}].shape: {sample_imgs[i].shape}")
             plt.subplot(2, 3, i+1)
             plt.imshow(
                 sample_imgs.detach()[i, 0, :, :], cmap="gray_r", interpolation="none"

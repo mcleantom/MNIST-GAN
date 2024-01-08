@@ -28,7 +28,7 @@ def get_accelerator_and_gpus() -> Tuple[str, int]:
 @app.command()
 def main(
     n_batch: int = 256,
-    seed: int = 42,
+    seed: int = 7,
     lr: float = 0.001,
     max_epochs: int = 100,
     data_dir: Path = DEFAULT_DATA_DIR,
@@ -50,6 +50,17 @@ def main(
     trainer.fit(model, data)
     model.plot_imgs()
 
+@app.command("plot-checkpoint")
+def plot_checkpoint(
+        checkpoint_path: Optional[Path] = None,
+):
+    if checkpoint_path is None:
+        lightning_logs = Path.cwd() / "lightning_logs"
+        latest_version = sorted(lightning_logs.glob("version_*"))[-1]
+        latest_checkpoint = sorted(latest_version.glob("checkpoints/*.ckpt"))[-1]
+        checkpoint_path = latest_checkpoint
+    model = GAN.load_from_checkpoint(checkpoint_path)
+    model.plot_imgs()
 
 if __name__ == "__main__":
     app()
