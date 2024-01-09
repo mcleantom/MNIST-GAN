@@ -3,133 +3,167 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
+import torchvision
 
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, img_shape: tuple = (28, 28)):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
-        self.conv_drop = nn.Dropout2d()
-        self.fc1 = nn.Linear(1440, 50)
-        self.fc2 = nn.Linear(50, 1)
+        self.model = nn.Sequential(
+            nn.Linear(int(np.prod(img_shape)), 512),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(512, 256),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(256, 1),
+            nn.Sigmoid(),
+        )
     
-    def forward(self, x):
-        x = F.relu(F.max_pool2d(self.conv1(x), 2))
-        x = x.view(-1, 1440)
-        x = F.relu(self.fc1(x))
-        x = F.dropout(x, training=self.training)
-        x = self.fc2(x)
-        return torch.sigmoid(x)
+    def forward(self, img):
+        img_flat = img.view(img.size(0), -1)
+        validity = self.model(img_flat)
+        return validity
 
 
 class Generator(nn.Module):
 
-    def __init__(self, latent_dim: int):
+    def __init__(self, latent_dim: int, img_shape: tuple = (28, 28)):
         super().__init__()
-        self.fc1 = nn.Linear(latent_dim, 49*64)
-        self.ct1 = nn.ConvTranspose2d(64, 32, 4, stride=2)
-        self.ct2 = nn.ConvTranspose2d(32, 16, 4, stride=2)
-        self.conv = nn.Conv2d(16, 1, kernel_size=7)
+        self.img_shape = img_shape
+
+        def block(in_feat, out_feat, normalize=True):
+            layers = [nn.Linear(in_feat, out_feat)]
+            if normalize:
+                layers.append(nn.BatchNorm1d(out_feat, 0.8))
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            return layers
+        
+        self.model = nn.Sequential(
+            *block(latent_dim, 128, normalize=False),
+            *block(128, 256),
+            *block(256, 512),
+            *block(512, 1024),
+            nn.Linear(1024, int(np.prod(img_shape))),
+            nn.Tanh(),
+        )
     
-    def forward(self, x):
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = x.view(-1, 64, 7, 7)
-
-        x = self.ct1(x)
-        x = F.relu(x)
-        x = self.ct2(x)
-        x = F.leaky_relu(x)
-
-        return self.conv(x)
+    def forward(self, z):
+        img = self.model(z)
+        img = img.view(img.size(0), *self.img_shape)
+        return img
 
 
 class GAN(pl.LightningModule):
 
-    def __init__(self, latent_dim: int = 100, lr: float = 0.001):
+    def __init__(
+        self,
+        channels: int = 1,
+        width: int = 28,
+        height: int = 28,
+        latent_dim: int = 100,
+        lr: float = 0.001,
+        b1: float = 0.5,
+        b2: float = 0.999,
+        batch_size: int = 64,
+        **kwargs
+    ):
         super().__init__()
         self.save_hyperparameters()
-        self.generator = Generator(self.hparams.latent_dim)
-        self.discriminator = Discriminator()
         self.automatic_optimization = False
-        self.criterion = self.adversarial_loss
-    
-    def sample_z(self, n) -> torch.Tensor:
-        sample = torch.randn((n, self.hparams.latent_dim), device=self.device)
-        return sample
-    
-    def sample_G(self, n) -> torch.Tensor:
-        z = self.sample_z(n)
-        return self.generator(z)
+
+        data_shape = (channels, width, height)
+        self.generator = Generator(
+            latent_dim=self.hparams.latent_dim,
+            img_shape=data_shape
+        )
+        self.discriminator = Discriminator(img_shape=data_shape)
+        self.validation_z = torch.randn(8, self.hparams.latent_dim)
+        self.example_input_array = torch.zeros(2, self.hparams.latent_dim)
     
     def forward(self, z):
         return self.generator(z)
 
     def adversarial_loss(self, y_hat, y):
+        """
+        The advaserial loss is the loss function that calculates the
+        distance between the GAN distribution of the generated images
+        and the real images.
+        """
         return F.binary_cross_entropy(y_hat, y)
 
-    def training_step(self, batch, batch_idx):
-        g_opt, d_opt = self.optimizers()
+    def training_step(self, batch: tuple):
+        imgs, _ = batch
         
-        real_imgs, _ = batch
-        batch_size = real_imgs.size(0)
-        z = torch.randn(batch_size, self.hparams.latent_dim)
-        z = z.type_as(real_imgs)
+        optimizer_g, optimizer_d = self.optimizers()
 
-        fake_imgs = self(z)
-        y_hat = self.discriminator(fake_imgs)
-        y = torch.ones((batch_size, 1), device=self.device)
-        y = y.type_as(real_imgs)
-        g_loss = self.criterion(y_hat, y)
+        z = torch.randn(imgs.shape[0], self.hparams.latent_dim)
+        z = z.type_as(imgs)
 
-        real_label = torch.ones((batch_size, 1), device=self.device)
-        fake_label = torch.zeros((batch_size, 1), device=self.device)
+        # Train Generator
+        self.toggle_optimizer(optimizer_g)
+        self.generated_imgs = self(z)
 
-        g_X = self.sample_G(batch_size)
-        
-        d_x = self.discriminator(X)
-        errD_real = self.criterion(d_x, real_label)
+        sample_imgs = self.generated_imgs[:6]
+        grid = torchvision.utils.make_grid(sample_imgs)
+        self.logger.experiment.add_image("generated_images", grid, 0)
 
-        d_z = self.discriminator(X)
-        errD_real = self.criterion(d_x, real_label)
+        valid = torch.ones(imgs.size(0), 1)
+        valid = valid.type_as(imgs)
 
-        d_z = self.discriminator(g_X.detach())
-        errD_fake = self.criterion(d_z, fake_label)
+        g_loss = self.adversarial_loss(self.discriminator(self(z)), valid)
+        self.log("g_loss", g_loss, prog_bar=True)
+        self.manual_backward(g_loss)
+        optimizer_g.step()
+        optimizer_g.zero_grad()
+        self.untoggle_optimizer(optimizer_g)
 
-        errD = errD_real + errD_fake
+        # Train Discriminator
+        self.toggle_optimizer(optimizer_d)
+        valid = torch.ones(imgs.size(0), 1)
+        valid = valid.type_as(imgs)
+        real_loss = self.adversarial_loss(self.discriminator(imgs), valid)
 
-        d_opt.zero_grad()
-        self.manual_backward(errD)
-        d_opt.step()
+        fake = torch.zeros(imgs.size(0), 1)
+        fake = fake.type_as(imgs)
 
-        d_z = self.discriminator(g_X)
-        errG = self.criterion(d_z, real_label)
+        fake_loss = self.adversarial_loss(self.discriminator(self(z).detach()), fake)
 
-        g_opt.zero_grad()
-        self.manual_backward(errG)
-        g_opt.step()
+        d_loss = (real_loss + fake_loss) / 2
+        self.log("d_loss", d_loss, prog_bar=True)
+        self.manual_backward(d_loss)
+        optimizer_d.step()
+        optimizer_d.zero_grad()
+        self.untoggle_optimizer(optimizer_d)
 
-        self.log_dict({
-            "g_loss": errG,
-            "d_loss": errD,
-        }, prog_bar=True)
-
-        
     def configure_optimizers(self):
         lr = self.hparams.lr
-        opt_g = torch.optim.Adam(self.generator.parameters(), lr=lr)
-        opt_d = torch.optim.Adam(self.discriminator.parameters(), lr=lr)
+        b1 = self.hparams.b1
+        b2 = self.hparams.b2
+        opt_g = torch.optim.Adam(
+            self.generator.parameters(),
+            lr=lr,
+            betas=(b1, b2)
+        )
+        opt_d = torch.optim.Adam(
+            self.discriminator.parameters(),
+            lr=lr,
+            betas=(b1, b2)
+        )
         return [opt_g, opt_d]
+
+    def on_validation_epoch_end(self):
+        z = self.validation_z.type_as(self.generator.model[0].weight)
+        sample_imgs = self(z)
+        grid = torchvision.utils.make_grid(sample_imgs)
+        self.logger.experiment.add_image(
+            "generated_images",
+            grid,
+            self.current_epoch
+        )
     
     def plot_imgs(self):
-        z = self.sample_z(6)
-        sample_imgs = self(z).cpu()
-        for i in range(sample_imgs.size(0)):
-            plt.subplot(2, 3, i+1)
-            plt.imshow(
-                sample_imgs.detach()[i, 0, :, :], cmap="gray_r", interpolation="none"
-            )
-            plt.xticks([])
-            plt.yticks([])
-            plt.axis("off")
+        z = self.validation_z.type_as(self.generator.model[0].weight)
+        sample_imgs = self(z)
+        grid = torchvision.utils.make_grid(sample_imgs)
+        plt.imshow(grid.permute(1, 2, 0))
         plt.show()

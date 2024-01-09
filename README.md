@@ -11,6 +11,14 @@ pip install -r requirements.txt
 python -m mnist_gan main
 ```
 
+You can view the training progress by running `tensorboard --logdir=.` and navigating to `localhost:6006` in your browser.
+
+You can also plot a sample of generated images of the most recent epoch by running:
+
+```bash
+python -m mnist_gan plot-checkpoint
+```
+
 ## Example Output
 
 Epoch 0:

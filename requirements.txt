@@ -6,3 +6,4 @@ torchaudio
 typer
 pytorch-lightning
 matplotlib
+tensorboard

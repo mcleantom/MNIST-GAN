@@ -5,13 +5,30 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, random_split
 from torchvision.datasets import MNIST
 import pytorch_lightning as pl
+import torch
+
+
+__all__ = [
+    "MNISTDataModule",
+    "DEFAULT_DATA_DIR",
+    "BATCH_SIZE",
+    "NUM_WORKERS",
+]
 
 
 NUM_WORKERS = int(os.cpu_count() / 2)
 DEFAULT_DATA_DIR = Path(__file__).parent.parent / "data"
+BATCH_SIZE = 256 if torch.cuda.is_available() else 64
+NUM_WORKERS = int(os.cpu_count() / 2)
+
 
 class MNISTDataModule(pl.LightningDataModule):
-    def __init__(self, batch_size, data_dir: Path=DEFAULT_DATA_DIR, num_workers=NUM_WORKERS):
+    def __init__(
+        self,
+        batch_size: int = BATCH_SIZE,
+        data_dir: Path = DEFAULT_DATA_DIR,
+        num_workers: int = NUM_WORKERS
+    ):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
@@ -19,12 +36,12 @@ class MNISTDataModule(pl.LightningDataModule):
 
         self.transform = transforms.Compose(
             [
-                # Mean and Standard Deviation
-                # Inew = (I - I.mean) / I.std
                 transforms.ToTensor(),
                 transforms.Normalize((0.1307,), (0.3081,)),
             ]
         )
+        self.dims = (1, 28, 28)
+        self.num_classes = 10
 
     def prepare_data(self):
         MNIST(self.data_dir, train=True, download=True)

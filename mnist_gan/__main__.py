@@ -7,10 +7,10 @@ import numpy as np
 import torch
 import pytorch_lightning as pl
 
-from mnist_gan.data_module import MNISTDataModule
+from mnist_gan.data_module import MNISTDataModule, DEFAULT_DATA_DIR, BATCH_SIZE, NUM_WORKERS
 from mnist_gan.model import GAN
 
-DEFAULT_DATA_DIR = Path(__file__).parent.parent / "data"
+from pytorch_lightning import loggers as pl_loggers
 
 app = typer.Typer()
 
@@ -27,7 +27,7 @@ def get_accelerator_and_gpus() -> Tuple[str, int]:
 
 @app.command()
 def main(
-    n_batch: int = 256,
+    n_batch: int = BATCH_SIZE,
     seed: int = 7,
     lr: float = 0.001,
     max_epochs: int = 100,
@@ -36,6 +36,7 @@ def main(
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+    tensorboard = pl_loggers.TensorBoardLogger('./')
     data = MNISTDataModule(
         batch_size=n_batch,
         data_dir=data_dir
@@ -46,6 +47,7 @@ def main(
     trainer = pl.Trainer(
         max_epochs=max_epochs,
         accelerator=accelerator,
+        logger=tensorboard
     )
     trainer.fit(model, data)
     model.plot_imgs()
