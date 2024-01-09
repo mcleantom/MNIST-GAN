@@ -27,7 +27,7 @@ Epoch 0:
 
 Epoch 95:
 
-![Epoch 95](./images/epoch_95.png)
+![Epoch 95](./images/epoch_95 copy.png)
 
 ## Explanation
 
