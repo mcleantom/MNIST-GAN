@@ -5,7 +5,7 @@
 ## Setup
 
 ```bash
-conda create -n mnist-gan
+conda create -n mnist-gan python==3.11
 conda activate mnist-gan
 pip install -r requirements.txt
 python -m mnist_gan main
