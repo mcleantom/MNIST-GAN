@@ -37,21 +37,23 @@ In a Generative Adversarial Network (GAN), the generator and discriminator are t
 
 Purpose: The generator's primary role is to generate synthetic data that resembles the real data.
 Architecture: It takes random noise as input and transforms it into data samples that should be indistinguishable from real data by the discriminator.
-Training Objective: The generator aims to produce data that is difficult for the discriminator to distinguish from real data. Its objective is to minimize the discriminator's ability to differentiate between real and generated samples.
+Training Objective: The generator aims to produce data that is difficult for the discriminator to distinguish from real data.
 
 
 ### Discriminator:
 
 Purpose: The discriminator's primary role is to distinguish between real and generated data.
 Architecture: It takes both real and generated data as input and outputs a probability indicating the likelihood that the input data is real.
-Training Objective: The discriminator is trained to correctly classify real and generated samples. Its objective is to maximize the ability to differentiate between real and generated data. At the same time, it provides feedback to the generator to improve its ability to generate realistic data.
+Training Objective: The discriminator is trained to correctly classify real and generated samples.
 
+### Training:
 
 During training, the generator and discriminator are engaged in a continuous feedback loop:
 
 1. The generator creates synthetic data.
-2. The discriminator evaluates both real and generated data and provides feedback.
-3. The generator adjusts its parameters to produce more realistic data based on the discriminator's feedback.
-4. The discriminator adapts to the evolving capabilities of the generator.
+2. The generator is evaluated by how well it fools the discriminator.
+   i.e. the distance between the discriminator's prediction and the true label (ones)
+3. The discriminator is evaluated by how well it classifies real and generated data.
+   i.e. the average distance between the discriminator's prediction for the real images and the true label (ones) and the distance between the discriminator's prediction for the generated images and the false label (zeros)
 
 This adversarial process continues iteratively until the generator produces data that is difficult for the discriminator to distinguish from real data, resulting in a well-trained GAN. The equilibrium reached in this process ideally leads to the generation of high-quality synthetic data that closely matches the distribution of the real data.
